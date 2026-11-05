@@ -2032,7 +2032,11 @@ status_t ACodec::configureCodec(
     if (mIsVideo || mIsImage) {
         // determine need for software renderer
         bool usingSwRenderer = false;
-        if (haveNativeWindow && mComponentName.startsWith("OMX.google.")) {
+        // the S5PC110 SEC decoders deliver YUV420 byte buffers (their
+        // native-buffer path needs Samsung's display formats): render them
+        // like the software codecs
+        if (haveNativeWindow && (mComponentName.startsWith("OMX.google.") ||
+                mComponentName.startsWith("OMX.SEC."))) {
             usingSwRenderer = true;
             haveNativeWindow = false;
             (void)setPortMode(kPortIndexOutput, IOMX::kPortModePresetByteBuffer);
