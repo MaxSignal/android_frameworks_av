@@ -281,9 +281,25 @@ std::list<FrameRenderTracker::Info> SoftwareRenderer::render(
          mColorFormat == OMX_COLOR_FormatYUV420SemiPlanar ||
          mColorFormat == OMX_TI_COLOR_FormatYUV420PackedSemiPlanar ||
          mColorFormat == OMX_COLOR_FormatYUV420Planar16)) {
-        CHECK_EQ(0, mapper.lockYCbCr(buf->handle,
+        if (mapper.lockYCbCr(buf->handle,
                 GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY,
-                bounds, &ycbcr));
+                bounds, &ycbcr) != 0) {
+            // gralloc modules before lock_ycbcr (PowerVR SGX540 DDK):
+            // lock the YV12 buffer and lay out its planes as the YV12
+            // definition in graphics.h does
+            void *base = NULL;
+            CHECK_EQ(0, mapper.lock(buf->handle,
+                    GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY,
+                    bounds, &base));
+            size_t ystride = buf->stride;
+            size_t cstride = ((ystride / 2) + 15) & ~15;
+            ycbcr.y = base;
+            ycbcr.cr = (uint8_t *)base + ystride * buf->height;
+            ycbcr.cb = (uint8_t *)ycbcr.cr + cstride * buf->height / 2;
+            ycbcr.ystride = ystride;
+            ycbcr.cstride = cstride;
+            ycbcr.chroma_step = 1;
+        }
     } else {
         CHECK_EQ(0, mapper.lock(buf->handle,
                 GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY,
